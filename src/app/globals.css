@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+[data-theme="dark-plus"] {
+  --bg-base: #0d0d0d;
+  --bg-sidebar: #111111;
+  --bg-surface: #171717;
+  --bg-hover: #1f1f1f;
+  --bg-active: #252525;
+  --border: #2a2a2a;
+  --text-primary: #e8e8e8;
+  --text-secondary: #888888;
+  --text-accent: #c9a96e;
+  --accent: #c9a96e;
+  --accent-dim: rgba(201, 169, 110, 0.12);
+  --status-bar-bg: #0a0a0a;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Inter', sans-serif;
+  --font-display: 'Fraunces', serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+[data-theme="light"] {
+  --bg-base: #ffffff;
+  --bg-sidebar: #f8f8f8;
+  --bg-surface: #f3f3f3;
+  --bg-hover: #eeeeee;
+  --bg-active: #e5e5e5;
+  --border: #d4d4d4;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-accent: #9d6b22;
+  --accent: #9d6b22;
+  --accent-dim: rgba(157, 107, 34, 0.08);
+  --status-bar-bg: #e8e8e8;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
