@@ -16,10 +16,17 @@ export async function POST(request: NextRequest) {
       return Response.json({ html: '' });
     }
 
+    const mermaidBlocks: string[] = [];
     let processedContent = content.replace(
       /^> \[!(NOTE|WARNING|TIP|DANGER)\]\n((?:> .*\n?)*)/gm,
       (match: string, type: string, calloutContent: string) => {
         return `\n<div class="callout callout-${type.toLowerCase()}">\n\n${calloutContent.replace(/^> /gm, '')}\n</div>\n`;
+      }
+    ).replace(
+      /^```mermaid\n([\s\S]*?)```/gm,
+      (match: string, content: string) => {
+        mermaidBlocks.push(content);
+        return `\n<div class="mermaid-placeholder" data-id="${mermaidBlocks.length - 1}"></div>\n`;
       }
     );
 
@@ -33,8 +40,15 @@ export async function POST(request: NextRequest) {
       .use(rehypeKatex)
       .use(rehypeStringify, { allowDangerousHtml: true })
       .process(processedContent);
-      
-    return Response.json({ html: String(file) });
+    let html = String(file);
+    mermaidBlocks.forEach((content, i) => {
+      html = html.replace(
+        new RegExp(`<div class="mermaid-placeholder" data-id="${i}"></div>`, 'g'),
+        `<div class="mermaid">${content}</div>`
+      );
+    });
+    
+    return Response.json({ html });
   } catch (err) {
     console.error('Compilation error', err);
     return Response.json({ html: `<p style="color:red">Error: ${String(err)}</p>` });

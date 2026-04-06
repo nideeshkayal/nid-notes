@@ -28,11 +28,17 @@ export async function GET(request: NextRequest) {
     // Compile HTML
     const { content: mdContent, data: frontmatter } = matter(note.content);
     
-    // Callouts preprocessing
+    const mermaidBlocks: string[] = [];
     let processedContent = mdContent.replace(
       /^> \[!(NOTE|WARNING|TIP|DANGER)\]\n((?:> .*\n?)*)/gm,
       (match, type, content) => {
         return `\n<div class="callout callout-${type.toLowerCase()}">\n\n${content.replace(/^> /gm, '')}\n</div>\n`;
+      }
+    ).replace(
+      /^```mermaid\n([\s\S]*?)```/gm,
+      (match, content) => {
+        mermaidBlocks.push(content);
+        return `\n<div class="mermaid-placeholder" data-id="${mermaidBlocks.length - 1}"></div>\n`;
       }
     );
 
@@ -49,6 +55,12 @@ export async function GET(request: NextRequest) {
         .use(rehypeStringify, { allowDangerousHtml: true })
         .process(processedContent);
       html = String(file);
+      mermaidBlocks.forEach((content, i) => {
+        html = html.replace(
+          new RegExp(`<div class="mermaid-placeholder" data-id="${i}"></div>`, 'g'),
+          `<div class="mermaid">${content}</div>`
+        );
+      });
     } catch (err) {
       console.error('Error compiling markdown', err);
       html = `<p>Error compiling Markdown</p><pre>${mdContent}</pre>`;

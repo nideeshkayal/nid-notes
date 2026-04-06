@@ -50,23 +50,12 @@ export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (h
       if (!article) return;
       
       // Mermaid initialization
-      const mermaidEls = article.querySelectorAll('code.language-mermaid');
+      const mermaidEls = article.querySelectorAll('.mermaid');
       if (mermaidEls.length > 0) {
         try {
           const { default: mermaid } = await import('mermaid');
           mermaid.initialize({ startOnLoad: false, theme: 'dark' });
-          
-          mermaidEls.forEach((el) => {
-            const pre = el.parentElement;
-            if (pre && pre.tagName === 'PRE') {
-              const div = document.createElement('div');
-              div.className = 'mermaid';
-              div.textContent = el.textContent || '';
-              pre.replaceWith(div);
-            }
-          });
-          
-          await mermaid.run({ nodes: article.querySelectorAll('.mermaid') });
+          await mermaid.run({ nodes: Array.from(mermaidEls) as HTMLElement[] });
         } catch (err) {
           console.error('Mermaid render error', err);
         }
