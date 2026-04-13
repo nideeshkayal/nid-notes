@@ -229,6 +229,10 @@ html, body {
   font-family: var(--font-body);
 }
 
+body[data-print-mode] {
+  overflow: visible;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -510,6 +514,11 @@ html, body {
   margin: 1rem 0;
 }
 
+.prose .mermaid {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
 /* Code block language label */
 .code-block-wrapper {
   position: relative;
@@ -607,4 +616,54 @@ html, body {
 
 .animate-scaleIn {
   animation: scaleIn 0.12s ease-out;
+}
+
+@media print {
+  html, body {
+    height: auto;
+    overflow: visible;
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  #navbar,
+  #file-explorer,
+  #outline-panel,
+  #status-bar,
+  #tab-bar,
+  #editor-toolbar,
+  #editor-action-bar {
+    display: none !important;
+  }
+
+  body[data-print-mode="note"] #reader-container,
+  body[data-print-mode="editor"] #editor-preview-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body[data-print-mode="editor"] #editor-pane-shell > :not(#editor-preview-shell) {
+    display: none !important;
+  }
+
+  body[data-print-mode="note"] #reader-container article,
+  body[data-print-mode="editor"] #editor-preview-content {
+    color: #111111 !important;
+  }
+
+  .prose pre,
+  .prose blockquote,
+  .prose table,
+  .prose img,
+  .prose .callout,
+  .prose .mermaid {
+    break-inside: avoid;
+  }
+
+  .prose pre {
+    border: 1px solid #d4d4d4;
+    background: #f8f8f8 !important;
+  }
 }

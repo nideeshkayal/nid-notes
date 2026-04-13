@@ -1,20 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
+type FrontmatterValue = string | number | boolean | string[] | undefined;
+type FrontmatterState = Record<string, FrontmatterValue>;
+
 interface FrontmatterFormProps {
-  frontmatter: any;
-  onChange: (fm: any) => void;
+  frontmatter: FrontmatterState;
+  onChange: (fm: FrontmatterState) => void;
 }
 
 export default function FrontmatterForm({ frontmatter, onChange }: FrontmatterFormProps) {
   const [expanded, setExpanded] = useState(false);
-  const [tagInput, setTagInput] = useState(() => (frontmatter.tags || []).join(', '));
-
-  useEffect(() => {
-    setTagInput((frontmatter.tags || []).join(', '));
-  }, [frontmatter.tags]);
+  const tagValue = Array.isArray(frontmatter.tags) ? frontmatter.tags.join(', ') : '';
 
   return (
     <div style={{
@@ -47,12 +46,11 @@ export default function FrontmatterForm({ frontmatter, onChange }: FrontmatterFo
 
       {expanded && (
         <div style={{ padding: '8px 16px 16px 36px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Simple Form Fields */}
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-primary)' }}>
             Title
             <input
               type="text"
-              value={frontmatter.title || ''}
+              value={typeof frontmatter.title === 'string' ? frontmatter.title : ''}
               onChange={e => onChange({ ...frontmatter, title: e.target.value })}
               style={{ padding: '6px 8px', background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 4, outline: 'none' }}
               placeholder="Auto-inferred from filename or H1 if empty"
@@ -62,9 +60,11 @@ export default function FrontmatterForm({ frontmatter, onChange }: FrontmatterFo
             Tags (comma separated)
             <input
               type="text"
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onBlur={() => onChange({ ...frontmatter, tags: tagInput.split(',').map((t: string) => t.trim()).filter(Boolean) })}
+              value={tagValue}
+              onChange={e => onChange({
+                ...frontmatter,
+                tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean),
+              })}
               style={{ padding: '6px 8px', background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 4, outline: 'none' }}
               placeholder="e.g. devops, docker, setup"
             />

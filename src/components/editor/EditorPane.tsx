@@ -1,113 +1,157 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { Download, Eye, Layout, Type, Image as ImageIcon, X, Copy } from 'lucide-react';
+import matter from 'gray-matter';
 import FrontmatterForm from './FrontmatterForm';
 import ImagePicker from './ImagePicker';
+import { exportToPdf } from '@/lib/exportUtils';
+
+type FrontmatterValue = string | number | boolean | string[] | undefined;
+type FrontmatterState = Record<string, FrontmatterValue>;
+
+type DraftState = {
+  content: string;
+  htmlPreview: string;
+  frontmatter: FrontmatterState;
+  filename: string;
+  folder: string;
+};
+
+function getFolderFromPath(notePath: string) {
+  const folderParts = notePath.split('/');
+  folderParts.pop();
+  return folderParts.length ? `${folderParts.join('/')}/` : '';
+}
+
+function createInitialState(editorMode: 'new' | 'existing'): DraftState {
+  if (typeof window === 'undefined' || editorMode !== 'new') {
+    return { content: '', htmlPreview: '', frontmatter: {}, filename: '', folder: '' };
+  }
+
+  const savedDraft = localStorage.getItem('nid-notes-draft');
+  if (!savedDraft) {
+    return { content: '', htmlPreview: '', frontmatter: {}, filename: '', folder: '' };
+  }
+
+  try {
+    const draft = JSON.parse(savedDraft) as Partial<DraftState>;
+    return {
+      content: draft.content || '',
+      htmlPreview: '',
+      frontmatter: draft.frontmatter || {},
+      filename: draft.filename || '',
+      folder: draft.folder || '',
+    };
+  } catch {
+    return { content: '', htmlPreview: '', frontmatter: {}, filename: '', folder: '' };
+  }
+}
 
 export default function EditorPane() {
-  const { isEditing, setIsEditing, editorMode, editorNotePath } = useApp();
-  
-  const [content, setContent] = useState('');
-  const [htmlPreview, setHtmlPreview] = useState('');
-  const [frontmatter, setFrontmatter] = useState<any>({});
+  const { isEditing, editorMode, editorNotePath } = useApp();
+
+  if (!isEditing) return null;
+
+  return <EditorPaneSession key={`${editorMode}:${editorNotePath || 'new'}`} />;
+}
+
+function EditorPaneSession() {
+  const { setIsEditing, editorMode, editorNotePath, theme } = useApp();
+  const compileRequestRef = useRef(0);
+  const [state, setState] = useState<DraftState>(() => createInitialState(editorMode));
   const [previewMode, setPreviewMode] = useState<'editor' | 'split' | 'preview'>('split');
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
-  const [filename, setFilename] = useState('');
-  const [folder, setFolder] = useState('');
+  const [copyLabel, setCopyLabel] = useState('Copy MD');
+  const [downloadLabel, setDownloadLabel] = useState('.md');
+  const [pdfLabel, setPdfLabel] = useState('.pdf');
 
-  // Load draft from localStorage on mount
   useEffect(() => {
-    if (!isEditing) return;
-    
-    if (editorMode === 'new') {
-      // Check for existing draft
-      const savedDraft = localStorage.getItem('nid-notes-draft');
-      if (savedDraft) {
-        try {
-          const draft = JSON.parse(savedDraft);
-          setContent(draft.content || '');
-          setFrontmatter(draft.frontmatter || {});
-          setFilename(draft.filename || '');
-          setFolder(draft.folder || '');
-        } catch {
-          setContent('');
-          setFrontmatter({});
+    if (editorMode !== 'existing' || !editorNotePath) return;
+
+    let cancelled = false;
+    fetch(`/api/notes?path=${encodeURIComponent(editorNotePath)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data && typeof data.content === 'string') {
+          setState({
+            content: data.content,
+            htmlPreview: '',
+            frontmatter: (data.frontmatter || {}) as FrontmatterState,
+            filename: editorNotePath.split('/').pop() || '',
+            folder: getFolderFromPath(editorNotePath),
+          });
         }
-      } else {
-        setContent('');
-        setFrontmatter({});
-        setFilename('');
-        setFolder('');
-      }
-    } else if (editorMode === 'existing') {
-      if (!editorNotePath) return;
-      fetch(`/api/notes?path=${encodeURIComponent(editorNotePath)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.content) {
-            setContent(data.content || '');
-            setFrontmatter(data.frontmatter || {});
-            setFilename(editorNotePath.split('/').pop() || '');
-            const folderParts = editorNotePath.split('/');
-            folderParts.pop();
-            setFolder(folderParts.length ? folderParts.join('/') + '/' : '');
-          }
-        });
-    }
-  }, [isEditing, editorMode]);
+      });
 
-  // Autosave draft to localStorage every 3 seconds
+    return () => {
+      cancelled = true;
+    };
+  }, [editorMode, editorNotePath]);
+
   useEffect(() => {
-    if (!isEditing || !content) return;
-    
+    if (!state.content) return;
+
     const timeout = setTimeout(() => {
       localStorage.setItem('nid-notes-draft', JSON.stringify({
-        content,
-        frontmatter,
-        filename,
-        folder,
+        content: state.content,
+        frontmatter: state.frontmatter,
+        filename: state.filename,
+        folder: state.folder,
         timestamp: new Date().toISOString(),
       }));
     }, 3000);
 
     return () => clearTimeout(timeout);
-  }, [content, frontmatter, filename, folder, isEditing]);
+  }, [state.content, state.filename, state.folder, state.frontmatter]);
 
-  // Debounced Compilation Effect for preview
   useEffect(() => {
-    if (previewMode === 'editor') return;
-    
+    if (previewMode === 'editor' || !state.content.trim()) return;
+
+    const requestId = ++compileRequestRef.current;
     const timeout = setTimeout(async () => {
       try {
         const res = await fetch('/api/compile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content })
+          body: JSON.stringify({ content: state.content, theme }),
         });
         const data = await res.json();
-        setHtmlPreview(data.html || '');
+        if (requestId === compileRequestRef.current) {
+          setState(prev => ({ ...prev, htmlPreview: data.html || '' }));
+        }
       } catch (err) {
-        setHtmlPreview(`<p style="color:red">Preview Compilation Error: ${String(err)}</p>`);
+        if (requestId === compileRequestRef.current) {
+          setState(prev => ({
+            ...prev,
+            htmlPreview: `<p style="color:red">Preview Compilation Error: ${String(err)}</p>`,
+          }));
+        }
       }
-    }, 500);
+    }, 350);
 
     return () => clearTimeout(timeout);
-  }, [content, previewMode]);
+  }, [previewMode, state.content, theme]);
+
+  const resetActionLabel = (setter: React.Dispatch<React.SetStateAction<string>>, value: string) => {
+    window.setTimeout(() => setter(value), 2000);
+  };
+
+  const getFullMarkdown = () => {
+    if (Object.keys(state.frontmatter).length === 0) {
+      return state.content;
+    }
+    return matter.stringify(state.content, state.frontmatter);
+  };
 
   const handleDownloadMd = () => {
-    const matter = frontmatter && Object.keys(frontmatter).length > 0
-      ? `---\n${Object.entries(frontmatter).map(([k, v]) => {
-          if (Array.isArray(v)) return `${k}: [${v.join(', ')}]`;
-          return `${k}: ${v}`;
-        }).join('\n')}\n---\n\n`
-      : '';
-    const fullContent = matter + content;
-    const name = filename || 'untitled-note';
+    const fullContent = getFullMarkdown();
+    const name = state.filename || 'untitled-note';
     const blob = new Blob([fullContent], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -117,107 +161,69 @@ export default function EditorPane() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setDownloadLabel('Downloaded');
+    resetActionLabel(setDownloadLabel, '.md');
   };
 
   const handleDownloadPdf = async () => {
-    // Use html2canvas + jsPDF for PDF export
-    const previewEl = document.getElementById('editor-preview-content');
-    if (!previewEl) {
-      alert('Switch to Split or Preview mode to download as PDF');
+    if (previewMode === 'editor') {
+      alert('Switch to Split or Preview mode to export a PDF.');
       return;
     }
-    
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const { default: jsPDF } = await import('jspdf');
-      
-      const canvas = await html2canvas(previewEl, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#0d0d0d',
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      // Handle multi-page
-      let heightLeft = pdfHeight;
-      let position = 0;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-      
-      while (heightLeft > 0) {
-        position = heightLeft - pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      pdf.save(`${filename || 'untitled-note'}.pdf`);
-    } catch (error) {
-      console.error('Failed to export PDF', error);
-      alert('PDF export failed. Please try again.');
-    }
+
+    setPdfLabel('Preparing PDF...');
+    await exportToPdf('editor');
+    setPdfLabel('Print dialog opened');
+    resetActionLabel(setPdfLabel, '.pdf');
   };
 
-  const handleCopyMarkdown = () => {
-    navigator.clipboard.writeText(content);
-  };
-
-  const handleEditorChange = (value: string) => {
-    setContent(value);
+  const handleCopyMarkdown = async () => {
+    await navigator.clipboard.writeText(state.content);
+    setCopyLabel('Copied!');
+    resetActionLabel(setCopyLabel, 'Copy MD');
   };
 
   const handleClose = () => {
     setIsEditing(false);
-    setContent('');
-    setFrontmatter({});
-    setHtmlPreview('');
-    setFilename('');
-    setFolder('');
   };
 
-  if (!isEditing) return null;
+  const wordCount = state.content.split(/\s+/).filter(Boolean).length;
+  const renderedPreview = state.content.trim() ? state.htmlPreview : '';
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'var(--bg-base)',
-      zIndex: 100,
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {/* Editor Header / Toolbar */}
-      <div style={{
-        height: 48,
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg-sidebar)',
+    <div
+      id="editor-pane-shell"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'var(--bg-base)',
+        zIndex: 100,
         display: 'flex',
-        alignItems: 'center',
-        padding: '0 16px',
-        gap: 8,
-        fontFamily: 'var(--font-mono)',
-        fontSize: 13,
-      }}>
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        id="editor-toolbar"
+        style={{
+          height: 48,
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg-sidebar)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 16px',
+          gap: 8,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 13,
+        }}
+      >
         <div style={{ color: 'var(--text-accent)', fontWeight: 600, marginRight: 8 }}>
           ▌Create Note
         </div>
-        
-        {/* Filename input */}
+
         <input
           type="text"
-          value={filename}
-          onChange={e => setFilename(e.target.value)}
+          value={state.filename}
+          onChange={e => setState(prev => ({ ...prev, filename: e.target.value }))}
           placeholder="filename"
           style={{
             background: 'var(--bg-base)',
@@ -232,14 +238,13 @@ export default function EditorPane() {
           }}
         />
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>.md</span>
-        
+
         <span style={{ color: 'var(--text-muted)', fontSize: 11, margin: '0 4px' }}>in</span>
-        
-        {/* Folder input */}
+
         <input
           type="text"
-          value={folder}
-          onChange={e => setFolder(e.target.value)}
+          value={state.folder}
+          onChange={e => setState(prev => ({ ...prev, folder: e.target.value }))}
           placeholder="notes/ (root)"
           style={{
             background: 'var(--bg-base)',
@@ -255,8 +260,7 @@ export default function EditorPane() {
         />
 
         <div style={{ flex: 1 }} />
-        
-        {/* Image button */}
+
         <button
           onClick={() => setImagePickerOpen(true)}
           style={{
@@ -266,7 +270,9 @@ export default function EditorPane() {
             borderRadius: 4,
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
             fontFamily: 'var(--font-mono)',
             fontSize: 11,
           }}
@@ -274,7 +280,6 @@ export default function EditorPane() {
           <ImageIcon size={12} /> Image
         </button>
 
-        {/* View toggle */}
         <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: 6, padding: 2 }}>
           <button
             onClick={() => setPreviewMode('editor')}
@@ -285,7 +290,9 @@ export default function EditorPane() {
               borderRadius: 4,
               color: previewMode === 'editor' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
               fontSize: 11,
             }}
           >
@@ -300,7 +307,9 @@ export default function EditorPane() {
               borderRadius: 4,
               color: previewMode === 'split' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
               fontSize: 11,
             }}
           >
@@ -315,7 +324,9 @@ export default function EditorPane() {
               borderRadius: 4,
               color: previewMode === 'preview' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
               fontSize: 11,
             }}
           >
@@ -338,22 +349,26 @@ export default function EditorPane() {
         </button>
       </div>
 
-      {/* Editor Body */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {(previewMode === 'editor' || previewMode === 'split') && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            borderRight: previewMode === 'split' ? '1px solid var(--border)' : 'none',
-          }}>
-            <FrontmatterForm frontmatter={frontmatter} onChange={setFrontmatter} />
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              borderRight: previewMode === 'split' ? '1px solid var(--border)' : 'none',
+            }}
+          >
+            <FrontmatterForm
+              frontmatter={state.frontmatter}
+              onChange={(frontmatter) => setState(prev => ({ ...prev, frontmatter }))}
+            />
             <div style={{ flex: 1, overflow: 'auto', background: 'var(--code-bg)' }}>
               <CodeMirror
-                value={content}
+                value={state.content}
                 height="100%"
                 extensions={[markdown({ base: markdownLanguage, codeLanguages: languages })]}
-                onChange={handleEditorChange}
+                onChange={(content) => setState(prev => ({ ...prev, content }))}
                 theme="dark"
                 style={{ fontSize: 14, fontFamily: 'var(--font-mono)' }}
               />
@@ -362,33 +377,38 @@ export default function EditorPane() {
         )}
 
         {(previewMode === 'preview' || previewMode === 'split') && (
-          <div style={{ flex: 1, padding: 32, overflowY: 'auto', background: 'var(--bg-base)' }}>
+          <div
+            id="editor-preview-shell"
+            style={{ flex: 1, padding: 32, overflowY: 'auto', background: 'var(--bg-base)' }}
+          >
             <div
               id="editor-preview-content"
               className="prose"
               style={{ maxWidth: '72ch', margin: '0 auto', color: 'var(--text-primary)' }}
-              dangerouslySetInnerHTML={{ __html: htmlPreview }}
+              dangerouslySetInnerHTML={{ __html: renderedPreview }}
             />
           </div>
         )}
       </div>
 
-      {/* Bottom Action Bar */}
-      <div style={{
-        height: 40,
-        borderTop: '1px solid var(--border)',
-        background: 'var(--bg-sidebar)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 16px',
-        gap: 8,
-        fontFamily: 'var(--font-mono)',
-        fontSize: 11,
-      }}>
+      <div
+        id="editor-action-bar"
+        style={{
+          height: 40,
+          borderTop: '1px solid var(--border)',
+          background: 'var(--bg-sidebar)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 16px',
+          gap: 8,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+        }}
+      >
         <span style={{ color: 'var(--text-muted)' }}>
-          {content.split(/\s+/).filter(Boolean).length} words · {Math.max(1, Math.round(content.split(/\s+/).filter(Boolean).length / 200))} min read
+          {wordCount} words · {Math.max(1, Math.round(wordCount / 200))} min read
         </span>
-        
+
         <div style={{ flex: 1 }} />
 
         <button
@@ -400,10 +420,12 @@ export default function EditorPane() {
             padding: '4px 10px',
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
           }}
         >
-          <Download size={11} /> .md
+          <Download size={11} /> {downloadLabel}
         </button>
         <button
           onClick={handleDownloadPdf}
@@ -414,10 +436,12 @@ export default function EditorPane() {
             padding: '4px 10px',
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
           }}
         >
-          <Download size={11} /> .pdf
+          <Download size={11} /> {pdfLabel}
         </button>
         <button
           onClick={handleCopyMarkdown}
@@ -428,20 +452,22 @@ export default function EditorPane() {
             padding: '4px 10px',
             color: 'var(--text-secondary)',
             cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
           }}
         >
-          <Copy size={11} /> Copy MD
+          <Copy size={11} /> {copyLabel}
         </button>
       </div>
 
       {imagePickerOpen && (
-        <ImagePicker 
-          onClose={() => setImagePickerOpen(false)} 
+        <ImagePicker
+          onClose={() => setImagePickerOpen(false)}
           onSelect={(url) => {
-            setContent(prev => prev + `\n![Image](${url})\n`);
+            setState(prev => ({ ...prev, content: `${prev.content}\n![Image](${url})\n` }));
             setImagePickerOpen(false);
-          }} 
+          }}
         />
       )}
     </div>
