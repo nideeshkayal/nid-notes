@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Calendar, User, FileText, BookOpen } from 'lucide-react';
 
@@ -9,7 +9,13 @@ export type NoteData = {
   html: string;
   lastModified: string;
   wordCount: number;
-  frontmatter?: any;
+  frontmatter?: {
+    title?: string;
+    tags?: string[];
+    author?: string;
+    created?: string | Date;
+    draft?: boolean;
+  };
 };
 
 export type HeadingItem = {
@@ -18,8 +24,36 @@ export type HeadingItem = {
   id: string;
 };
 
-export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (headings: HeadingItem[]) => void }) {
-  const { activeNotePath } = useApp();
+export type NoteMeta = {
+  wordCount: number;
+  readingTime: number;
+  lastModified: string;
+};
+
+const noteCache = new Map<string, NoteData>();
+
+function decodeMermaidGraph(value: string) {
+  try {
+    const binary = window.atob(value);
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return '';
+  }
+}
+
+function getMermaidTheme(theme: string) {
+  return theme === 'light' || theme === 'sepia' ? 'neutral' : 'dark';
+}
+
+export default function NoteReader({
+  onHeadingsChange,
+  onMetaChange,
+}: {
+  onHeadingsChange?: (headings: HeadingItem[]) => void;
+  onMetaChange?: (meta: NoteMeta | null) => void;
+}) {
+  const { activeNotePath, theme } = useApp();
   const [noteData, setNoteData] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -27,34 +61,67 @@ export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (h
   useEffect(() => {
     if (!activeNotePath) {
       setNoteData(null);
+      setLoading(false);
+      onHeadingsChange?.([]);
+      onMetaChange?.(null);
+      return;
+    }
+
+    const cacheKey = `${activeNotePath}:${theme}`;
+    const cached = noteCache.get(cacheKey);
+
+    onHeadingsChange?.([]);
+    onMetaChange?.(null);
+    setNoteData(null);
+
+    if (cached) {
+      setLoading(false);
+      setNoteData(cached);
       return;
     }
 
     setLoading(true);
-    fetch(`/api/notes?path=${encodeURIComponent(activeNotePath)}`)
+    fetch(`/api/notes?path=${encodeURIComponent(activeNotePath)}&theme=${encodeURIComponent(theme)}`)
       .then(res => res.json())
       .then(data => {
+        noteCache.set(cacheKey, data);
         setNoteData(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [activeNotePath]);
+  }, [activeNotePath, onHeadingsChange, onMetaChange, theme]);
 
-  // Extract headings and initialize mermaid
   useEffect(() => {
-    if (!noteData?.html || !onHeadingsChange || !contentRef.current) return;
+    if (!noteData?.html || !contentRef.current) {
+      return;
+    }
 
-    // Wait for DOM to render the HTML
-    const timer = setTimeout(async () => {
+    onMetaChange?.({
+      wordCount: noteData.wordCount,
+      readingTime: Math.max(1, Math.round(noteData.wordCount / 200)),
+      lastModified: noteData.lastModified,
+    });
+
+    let cancelled = false;
+
+    const renderContent = async () => {
+      await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+      if (cancelled) return;
+
       const article = contentRef.current?.querySelector('article');
       if (!article) return;
-      
-      // Mermaid initialization
+
       const mermaidEls = article.querySelectorAll('.mermaid');
       if (mermaidEls.length > 0) {
         try {
           const { default: mermaid } = await import('mermaid');
-          mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+          mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme(theme) });
+          mermaidEls.forEach(el => {
+            const graph = (el as HTMLElement).dataset.graph || '';
+            el.removeAttribute('data-processed');
+            el.innerHTML = '';
+            el.textContent = decodeMermaidGraph(graph);
+          });
           await mermaid.run({ nodes: Array.from(mermaidEls) as HTMLElement[] });
         } catch (err) {
           console.error('Mermaid render error', err);
@@ -63,18 +130,22 @@ export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (h
 
       const headingEls = article.querySelectorAll('h1, h2, h3, h4');
       const headings: HeadingItem[] = [];
-      
+
       headingEls.forEach((el) => {
         const level = parseInt(el.tagName.charAt(1));
         const text = el.textContent || '';
         headings.push({ level, text, id: el.id });
       });
-      
-      onHeadingsChange(headings);
-    }, 100);
 
-    return () => clearTimeout(timer);
-  }, [noteData, onHeadingsChange]);
+      onHeadingsChange?.(headings);
+    };
+
+    renderContent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [noteData, onHeadingsChange, onMetaChange, theme]);
 
   if (!activeNotePath) {
     return <WelcomeScreen />;
@@ -129,7 +200,6 @@ export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (h
       className="animate-fadeIn"
     >
       <div style={{ maxWidth: '72ch', margin: '0 auto' }}>
-        {/* Note Header */}
         <header style={{ marginBottom: 24 }}>
           <h1 style={{
             fontFamily: 'var(--font-display)',
@@ -143,7 +213,6 @@ export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (h
             {title}
           </h1>
 
-          {/* Metadata Row */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -200,7 +269,6 @@ export default function NoteReader({ onHeadingsChange }: { onHeadingsChange?: (h
           }} />
         </header>
 
-        {/* Rendered Markdown */}
         <article
           className="prose"
           dangerouslySetInnerHTML={{ __html: renderedHtml }}

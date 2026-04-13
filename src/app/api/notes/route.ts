@@ -3,21 +3,16 @@ import { getNotesTree, getNoteContent } from '@/lib/getNotesTree';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import remarkRehype from 'remark-rehype';
-import rehypeKatex from 'rehype-katex';
-import rehypeStringify from 'rehype-stringify';
-import rehypeShiki from '@shikijs/rehype';
-import rehypeSlug from 'rehype-slug';
+import { compileMarkdownToHtml } from '@/lib/markdown';
 
 export const dynamic = 'force-dynamic';
+
+const noteHtmlCache = new Map<string, string>();
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const notePath = searchParams.get('path');
+  const theme = searchParams.get('theme') || 'dark-plus';
 
   if (notePath) {
     const note = getNoteContent(notePath);
@@ -27,40 +22,15 @@ export async function GET(request: NextRequest) {
     
     // Compile HTML
     const { content: mdContent, data: frontmatter } = matter(note.content);
-    
-    const mermaidBlocks: string[] = [];
-    let processedContent = mdContent.replace(
-      /^> \[!(NOTE|WARNING|TIP|DANGER)\]\n((?:> .*\n?)*)/gm,
-      (match, type, content) => {
-        return `\n<div class="callout callout-${type.toLowerCase()}">\n\n${content.replace(/^> /gm, '')}\n</div>\n`;
-      }
-    ).replace(
-      /^```mermaid\n([\s\S]*?)```/gm,
-      (match, content) => {
-        mermaidBlocks.push(content);
-        return `\n<div class="mermaid-placeholder" data-id="${mermaidBlocks.length - 1}"></div>\n`;
-      }
-    );
 
     let html = '';
     try {
-      const file = await unified()
-        .use(remarkParse)
-        .use(remarkGfm)
-        .use(remarkMath)
-        .use(remarkRehype, { allowDangerousHtml: true })
-        .use(rehypeSlug)
-        .use(rehypeShiki, { theme: 'github-dark' })
-        .use(rehypeKatex)
-        .use(rehypeStringify, { allowDangerousHtml: true })
-        .process(processedContent);
-      html = String(file);
-      mermaidBlocks.forEach((content, i) => {
-        html = html.replace(
-          new RegExp(`<div class="mermaid-placeholder" data-id="${i}"></div>`, 'g'),
-          `<div class="mermaid">${content}</div>`
-        );
-      });
+      const cacheKey = `${notePath}:${note.lastModified}:${theme}`;
+      html = noteHtmlCache.get(cacheKey) || await compileMarkdownToHtml(mdContent, theme);
+      if (!noteHtmlCache.has(cacheKey)) {
+        noteHtmlCache.clear();
+        noteHtmlCache.set(cacheKey, html);
+      }
     } catch (err) {
       console.error('Error compiling markdown', err);
       html = `<p>Error compiling Markdown</p><pre>${mdContent}</pre>`;

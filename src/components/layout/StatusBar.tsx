@@ -2,8 +2,10 @@
 
 import React from 'react';
 import { useApp, THEME_LABELS } from '@/context/AppContext';
+import type { NoteMeta } from '@/components/reader/NoteReader';
+import { format } from 'date-fns';
 
-export default function StatusBar() {
+export default function StatusBar({ noteMeta }: { noteMeta: NoteMeta | null }) {
   const { activeNotePath, theme } = useApp();
 
   return (
@@ -28,6 +30,13 @@ export default function StatusBar() {
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           ⎇ {activeNotePath ? `notes/${activeNotePath}.md` : 'No file open'}
         </span>
+        {noteMeta && (
+          <>
+            <span>{noteMeta.wordCount.toLocaleString()} words</span>
+            <span>{noteMeta.readingTime} min read</span>
+            <span>Updated {format(new Date(noteMeta.lastModified), 'MMM d, yyyy')}</span>
+          </>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <span>{THEME_LABELS[theme] || theme}</span>
