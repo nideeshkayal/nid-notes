@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { NoteNode } from '@/lib/getNotesTree';
 import {
@@ -11,8 +11,6 @@ import {
   FolderOpen,
   Star,
   RefreshCw,
-  FolderPlus,
-  FilePlus,
 } from 'lucide-react';
 
 function TreeNode({ node, depth = 0 }: { node: NoteNode; depth?: number }) {
@@ -140,7 +138,33 @@ export default function FileExplorer() {
   const [loading, setLoading] = useState(true);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
 
-  const fetchTree = async () => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchTree() {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/notes');
+        const data = await res.json();
+        if (!cancelled) {
+          setTree(data);
+        }
+      } catch (err) {
+        console.error('Failed to load notes tree:', err);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchTree();
+    return () => {
+      cancelled = true;
+    };
+  }, [setTree]);
+
+  const refreshTree = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/notes');
@@ -153,24 +177,19 @@ export default function FileExplorer() {
     }
   };
 
-  useEffect(() => {
-    fetchTree();
-  }, []);
-
-  // Collect all tags
-  const allTags: string[] = [];
-  function collectTags(nodes: NoteNode[]) {
-    for (const node of nodes) {
-      if (node.type === 'file' && node.frontmatter?.tags) {
-        node.frontmatter.tags.forEach(t => {
-          if (!allTags.includes(t)) allTags.push(t);
-        });
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    function collectTags(nodes: NoteNode[]) {
+      for (const node of nodes) {
+        if (node.type === 'file' && node.frontmatter?.tags) {
+          node.frontmatter.tags.forEach(t => tags.add(t));
+        }
+        if (node.children) collectTags(node.children);
       }
-      if (node.children) collectTags(node.children);
     }
-  }
-  collectTags(tree);
-  allTags.sort();
+    collectTags(tree);
+    return Array.from(tags).sort();
+  }, [tree]);
 
   // Filter tree by tag
   function filterByTag(nodes: NoteNode[]): NoteNode[] {
@@ -244,7 +263,7 @@ export default function FileExplorer() {
         </span>
         <div style={{ display: 'flex', gap: 2 }}>
           <button
-            onClick={fetchTree}
+            onClick={refreshTree}
             title="Refresh"
             style={{
               background: 'none',

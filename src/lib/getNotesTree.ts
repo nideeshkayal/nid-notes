@@ -46,8 +46,17 @@ export function getNotesTree(dir: string = NOTES_DIR, basePath: string = ''): No
     } else if (entry.name.endsWith('.md')) {
       const fileContent = fs.readFileSync(fullPath, 'utf-8');
       const { data } = matter(fileContent);
+      const stats = fs.statSync(fullPath);
       const nameWithoutExt = entry.name.replace(/\.md$/, '');
       const filePath = basePath ? `${basePath}/${nameWithoutExt}` : nameWithoutExt;
+
+      if (
+        nameWithoutExt === 'untitled-note' &&
+        stats.size < 32 &&
+        fileContent.trim().startsWith('![')
+      ) {
+        continue;
+      }
       
       nodes.push({
         type: 'file',

@@ -6,7 +6,6 @@ import {
   Search,
   Plus,
   Palette,
-  Keyboard,
   PanelLeft,
   PanelRight,
   ChevronRight,
