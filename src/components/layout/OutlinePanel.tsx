@@ -1,20 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { HeadingItem } from '@/components/reader/NoteReader';
-import { FileText, Clock, Calendar, Download, Copy, ChevronRight } from 'lucide-react';
+import { Download, Copy } from 'lucide-react';
+import { exportToPdf } from '@/lib/exportUtils';
 
 export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) {
   const { activeNotePath } = useApp();
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  const [copyLabel, setCopyLabel] = useState('Copy');
+  const [downloadLabel, setDownloadLabel] = useState('.md');
+  const [pdfLabel, setPdfLabel] = useState('.pdf');
 
-  // Scroll-spy via intersection observer
   useEffect(() => {
     if (headings.length === 0) return;
 
     const container = document.getElementById('reader-container');
-
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -26,19 +28,22 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
       { root: container, rootMargin: '-16px 0px -80% 0px' }
     );
 
-    // Delay to allow DOM to render
     const timer = setTimeout(() => {
       headings.forEach(h => {
         const el = document.getElementById(h.id);
         if (el) observer.observe(el);
       });
-    }, 300);
+    }, 150);
 
     return () => {
       clearTimeout(timer);
       observer.disconnect();
     };
   }, [headings]);
+
+  const resetActionLabel = (setter: React.Dispatch<React.SetStateAction<string>>, value: string) => {
+    window.setTimeout(() => setter(value), 2000);
+  };
 
   const scrollToHeading = (id: string) => {
     const el = document.getElementById(id);
@@ -59,6 +64,8 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
       const res = await fetch(`/api/notes?path=${encodeURIComponent(activeNotePath)}`);
       const data = await res.json();
       await navigator.clipboard.writeText(data.content);
+      setCopyLabel('Copied!');
+      resetActionLabel(setCopyLabel, 'Copy');
     } catch {}
   };
 
@@ -77,53 +84,17 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      setDownloadLabel('Downloaded');
+      resetActionLabel(setDownloadLabel, '.md');
     } catch {}
   };
 
   const handleDownloadPdf = async () => {
     if (!activeNotePath) return;
-    const filename = activeNotePath.split('/').pop() || 'note';
-    const element = document.getElementById('reader-container');
-    if (!element) return;
-    
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const { default: jsPDF } = await import('jspdf');
-      
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#0d0d0d',
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      let heightLeft = pdfHeight;
-      let position = 0;
-      
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-      
-      while (heightLeft > 0) {
-        position = heightLeft - pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      pdf.save(`${filename}.pdf`);
-    } catch (error) {
-      console.error('Failed to export PDF', error);
-    }
+    setPdfLabel('Preparing PDF...');
+    await exportToPdf('note');
+    setPdfLabel('Print dialog opened');
+    resetActionLabel(setPdfLabel, '.pdf');
   };
 
   return (
@@ -139,11 +110,7 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div style={{
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--border)',
-      }}>
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
         <span style={{
           fontFamily: 'var(--font-mono)',
           fontSize: 10,
@@ -156,7 +123,6 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
         </span>
       </div>
 
-      {/* Headings List */}
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
         {headings.length === 0 ? (
           <div style={{
@@ -194,28 +160,32 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
                   fontWeight: heading.level <= 2 ? 600 : 400,
                   textAlign: 'left',
                   transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-accent)')}
                 onMouseLeave={e => {
                   if (!isActive) e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
               >
-                {heading.text}
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: 'block',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {heading.text}
+                </span>
               </button>
             );
           })
         )}
       </div>
 
-      {/* File Metadata & Actions */}
       {activeNotePath && (
-        <div style={{
-          borderTop: '1px solid var(--border)',
-          padding: '12px',
-        }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px' }}>
           <div style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 11,
@@ -225,7 +195,7 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}>
-            📄 notes/{activeNotePath}.md
+            notes/{activeNotePath}.md
           </div>
 
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -245,16 +215,8 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
                 fontSize: 10,
                 transition: 'all 0.1s',
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'var(--accent)';
-                e.currentTarget.style.color = 'var(--text-accent)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
             >
-              <Download size={10} /> .md
+              <Download size={10} /> {downloadLabel}
             </button>
             <button
               onClick={handleDownloadPdf}
@@ -272,16 +234,8 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
                 fontSize: 10,
                 transition: 'all 0.1s',
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'var(--accent)';
-                e.currentTarget.style.color = 'var(--text-accent)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
             >
-              <Download size={10} /> .pdf
+              <Download size={10} /> {pdfLabel}
             </button>
             <button
               onClick={handleCopyMarkdown}
@@ -299,16 +253,8 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
                 fontSize: 10,
                 transition: 'all 0.1s',
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'var(--accent)';
-                e.currentTarget.style.color = 'var(--text-accent)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
             >
-              <Copy size={10} /> Copy
+              <Copy size={10} /> {copyLabel}
             </button>
           </div>
         </div>

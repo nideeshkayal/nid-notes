@@ -1,67 +1,81 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { NoteNode } from '@/lib/getNotesTree';
-import { Search, FileText, Folder, Hash, X, ArrowRight } from 'lucide-react';
+import { Search, FileText, ArrowRight } from 'lucide-react';
 
 export default function SearchModal() {
-  const { searchOpen, setSearchOpen, tree, openNote, pickForEditor, setPickForEditor, setIsEditing, setEditorMode, setEditorNotePath } = useApp();
+  const { searchOpen } = useApp();
+
+  if (!searchOpen) return null;
+
+  return <SearchModalContent />;
+}
+
+function SearchModalContent() {
+  const {
+    setSearchOpen,
+    tree,
+    openNote,
+    pickForEditor,
+    setPickForEditor,
+    setIsEditing,
+    setEditorMode,
+    setEditorNotePath,
+  } = useApp();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Collect all files flat
-  const allFiles = useCallback(() => {
-    const files: NoteNode[] = [];
+  const files = useMemo(() => {
+    const items: NoteNode[] = [];
     function traverse(nodes: NoteNode[]) {
-      for (const n of nodes) {
-        if (n.type === 'file') files.push(n);
-        if (n.children) traverse(n.children);
+      for (const node of nodes) {
+        if (node.type === 'file') items.push(node);
+        if (node.children) traverse(node.children);
       }
     }
     traverse(tree);
-    return files;
+    return items;
   }, [tree]);
 
-  const files = allFiles();
   const filtered = query.trim()
-    ? files.filter(f => {
+    ? files.filter(file => {
       const q = query.toLowerCase();
-      const name = (f.frontmatter?.title || f.name).toLowerCase();
-      const path = f.path.toLowerCase();
-      const tags = (f.frontmatter?.tags || []).join(' ').toLowerCase();
+      const name = String(file.frontmatter?.title || file.name).toLowerCase();
+      const path = file.path.toLowerCase();
+      const tags = (file.frontmatter?.tags || []).join(' ').toLowerCase();
       return name.includes(q) || path.includes(q) || tags.includes(q);
     })
     : files;
 
-  useEffect(() => {
-    if (searchOpen && inputRef.current) {
-      inputRef.current.focus();
-      setQuery('');
-      setSelectedIndex(0);
-    }
-  }, [searchOpen]);
+  const safeSelectedIndex = filtered.length === 0 ? 0 : Math.min(selectedIndex, filtered.length - 1);
 
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
+    inputRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setSearchOpen(!searchOpen);
+        setSearchOpen(false);
+        setPickForEditor(false);
       }
-      if (e.key === 'Escape' && searchOpen) {
+      if (e.key === 'Escape') {
         setSearchOpen(false);
         setPickForEditor(false);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [searchOpen, setSearchOpen]);
+  }, [setPickForEditor, setSearchOpen]);
 
   const handleSelectFile = (path: string) => {
     if (pickForEditor) {
@@ -82,12 +96,10 @@ export default function SearchModal() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(i => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && filtered[selectedIndex]) {
-      handleSelectFile(filtered[selectedIndex].path);
+    } else if (e.key === 'Enter' && filtered[safeSelectedIndex]) {
+      handleSelectFile(filtered[safeSelectedIndex].path);
     }
   };
-
-  if (!searchOpen) return null;
 
   return (
     <div
@@ -121,7 +133,6 @@ export default function SearchModal() {
         }}
         className="animate-scaleIn"
       >
-        {/* Search Input */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -133,9 +144,12 @@ export default function SearchModal() {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
             onKeyDown={handleKeyDown}
-            placeholder={pickForEditor ? "Select a note to edit..." : "Search notes, Jump to file..."}
+            placeholder={pickForEditor ? 'Select a note to edit...' : 'Search notes, Jump to file...'}
             style={{
               flex: 1,
               background: 'none',
@@ -166,10 +180,10 @@ export default function SearchModal() {
           </button>
         </div>
 
-        {/* Results */}
         <div style={{
           maxHeight: 360,
           overflow: 'auto',
+          overscrollBehavior: 'contain',
           padding: '4px 0',
         }}>
           {filtered.length === 0 ? (
@@ -198,16 +212,14 @@ export default function SearchModal() {
               {filtered.map((file, index) => (
                 <button
                   key={file.path}
-                  onClick={() => {
-                    handleSelectFile(file.path);
-                  }}
+                  onClick={() => handleSelectFile(file.path)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
                     width: '100%',
                     padding: '8px 16px',
-                    background: index === selectedIndex ? 'var(--bg-active)' : 'none',
+                    background: index === safeSelectedIndex ? 'var(--bg-active)' : 'none',
                     border: 'none',
                     color: 'var(--text-primary)',
                     cursor: 'pointer',
@@ -248,7 +260,7 @@ export default function SearchModal() {
                       ))}
                     </div>
                   )}
-                  {index === selectedIndex && (
+                  {index === safeSelectedIndex && (
                     <ArrowRight size={12} style={{ color: 'var(--text-accent)', flexShrink: 0 }} />
                   )}
                 </button>
@@ -257,7 +269,6 @@ export default function SearchModal() {
           )}
         </div>
 
-        {/* Footer Hints */}
         <div style={{
           padding: '8px 16px',
           borderTop: '1px solid var(--border)',

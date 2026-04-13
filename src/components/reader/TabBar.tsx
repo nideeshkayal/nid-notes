@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { X } from 'lucide-react';
 
 export default function TabBar() {
   const { openTabs, activeNotePath, openNote, closeTab } = useApp();
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
 
   if (openTabs.length === 0) return null;
 
@@ -31,6 +32,14 @@ export default function TabBar() {
           <div
             key={tabPath}
             onClick={() => openNote(tabPath)}
+            onMouseEnter={e => {
+              setHoveredTab(tabPath);
+              if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)';
+            }}
+            onMouseLeave={e => {
+              setHoveredTab(current => current === tabPath ? null : current);
+              if (!isActive) e.currentTarget.style.background = 'transparent';
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -47,12 +56,6 @@ export default function TabBar() {
               borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
               transition: 'all 0.1s ease',
               position: 'relative',
-            }}
-            onMouseEnter={e => {
-              if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)';
-            }}
-            onMouseLeave={e => {
-              if (!isActive) e.currentTarget.style.background = 'transparent';
             }}
           >
             <span style={{
@@ -76,7 +79,7 @@ export default function TabBar() {
                 borderRadius: 3,
                 display: 'flex',
                 flexShrink: 0,
-                opacity: isActive ? 1 : 0,
+                opacity: isActive || hoveredTab === tabPath ? 1 : 0,
                 transition: 'opacity 0.1s',
               }}
               onMouseEnter={e => {
