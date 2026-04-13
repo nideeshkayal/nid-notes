@@ -96,7 +96,7 @@ function EditorPaneSession() {
   }, [editorMode, editorNotePath]);
 
   useEffect(() => {
-    if (!state.content) return;
+    if (editorMode !== 'new' || !state.content) return;
 
     const timeout = setTimeout(() => {
       localStorage.setItem('nid-notes-draft', JSON.stringify({
@@ -109,7 +109,7 @@ function EditorPaneSession() {
     }, 3000);
 
     return () => clearTimeout(timeout);
-  }, [state.content, state.filename, state.folder, state.frontmatter]);
+  }, [editorMode, state.content, state.filename, state.folder, state.frontmatter]);
 
   useEffect(() => {
     if (previewMode === 'editor' || !state.content.trim()) return;
@@ -185,6 +185,7 @@ function EditorPaneSession() {
   };
 
   const handleClose = () => {
+    localStorage.removeItem('nid-notes-draft');
     setIsEditing(false);
   };
 

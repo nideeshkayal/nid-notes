@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Calendar, User, FileText, BookOpen } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 export type NoteData = {
   content: string;
@@ -53,7 +54,7 @@ export default function NoteReader({
   onHeadingsChange?: (headings: HeadingItem[]) => void;
   onMetaChange?: (meta: NoteMeta | null) => void;
 }) {
-  const { activeNotePath, theme } = useApp();
+  const { activeNotePath, theme, isEditing } = useApp();
   const [noteData, setNoteData] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -145,7 +146,7 @@ export default function NoteReader({
     return () => {
       cancelled = true;
     };
-  }, [noteData, onHeadingsChange, onMetaChange, theme]);
+  }, [noteData, onHeadingsChange, onMetaChange, theme, isEditing]);
 
   if (!activeNotePath) {
     return <WelcomeScreen />;
@@ -234,11 +235,19 @@ export default function NoteReader({
                 <User size={12} /> {frontmatter.author}
               </span>
             )}
-            {frontmatter.created && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Calendar size={12} /> {frontmatter.created instanceof Date ? frontmatter.created.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : String(frontmatter.created)}
-              </span>
-            )}
+            {frontmatter.created && (() => {
+              try {
+                const dateStr = String(frontmatter.created);
+                const parsed = dateStr.includes('T') ? parseISO(dateStr) : new Date(dateStr);
+                return (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Calendar size={12} /> {format(parsed, 'MMM d, yyyy')}
+                  </span>
+                );
+              } catch {
+                return null;
+              }
+            })()}
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <BookOpen size={12} /> {readingTime} min read
             </span>

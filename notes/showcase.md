@@ -24,7 +24,7 @@ graph TD
     classDef highlight fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#ffffff,rx:5px,ry:5px
     classDef error fill:#ef4444,stroke:#991b1b,stroke-width:2px,color:#ffffff,rx:5px,ry:5px
 
-    A[📄 Raw Markdown File] -->|Fetch via API| B(Next.js Endpoint)
+    A[  Raw Markdown File] -->|Fetch via API| B(Next.js Endpoint)
     
     B --> C{Has Frontmatter?}
     C -- Yes --> D[Extract Metadata]
@@ -40,8 +40,8 @@ graph TD
     H --> I
     
     I --> J{Hydration}
-    J -- Success --> K(((🎉 Rendered HTML)))
-    J -- Mismatch --> L[🔴 React Error]
+    J -- Success --> K(((Rendered HTML)))
+    J -- Mismatch --> L[React Error]
     
     class K highlight
     class L error
