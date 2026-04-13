@@ -5,6 +5,7 @@ import { useApp } from '@/context/AppContext';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
+import { EditorView } from '@codemirror/view';
 import { Download, Eye, Layout, Type, Image as ImageIcon, X, Copy } from 'lucide-react';
 import matter from 'gray-matter';
 import FrontmatterForm from './FrontmatterForm';
@@ -353,10 +354,13 @@ function EditorPaneSession() {
         {(previewMode === 'editor' || previewMode === 'split') && (
           <div
             style={{
-              flex: 1,
+              flex: previewMode === 'split' ? '0 0 50%' : '1 1 auto',
+              width: previewMode === 'split' ? '50%' : 'auto',
+              minWidth: 0,
               display: 'flex',
               flexDirection: 'column',
               borderRight: previewMode === 'split' ? '1px solid var(--border)' : 'none',
+              overflow: 'hidden',
             }}
           >
             <FrontmatterForm
@@ -367,10 +371,13 @@ function EditorPaneSession() {
               <CodeMirror
                 value={state.content}
                 height="100%"
-                extensions={[markdown({ base: markdownLanguage, codeLanguages: languages })]}
+                extensions={[
+                  markdown({ base: markdownLanguage, codeLanguages: languages }),
+                  EditorView.lineWrapping,
+                ]}
                 onChange={(content) => setState(prev => ({ ...prev, content }))}
                 theme="dark"
-                style={{ fontSize: 14, fontFamily: 'var(--font-mono)' }}
+                style={{ fontSize: 14, fontFamily: 'var(--font-mono)', height: '100%' }}
               />
             </div>
           </div>
@@ -379,12 +386,25 @@ function EditorPaneSession() {
         {(previewMode === 'preview' || previewMode === 'split') && (
           <div
             id="editor-preview-shell"
-            style={{ flex: 1, padding: 32, overflowY: 'auto', background: 'var(--bg-base)' }}
+            style={{
+              flex: previewMode === 'split' ? '0 0 50%' : '1 1 auto',
+              width: previewMode === 'split' ? '50%' : 'auto',
+              minWidth: 0,
+              padding: 32,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              background: 'var(--bg-base)',
+            }}
           >
             <div
               id="editor-preview-content"
               className="prose"
-              style={{ maxWidth: '72ch', margin: '0 auto', color: 'var(--text-primary)' }}
+              style={{
+                maxWidth: previewMode === 'split' ? '100%' : '72ch',
+                margin: '0 auto',
+                color: 'var(--text-primary)',
+                overflowWrap: 'anywhere',
+              }}
               dangerouslySetInnerHTML={{ __html: renderedPreview }}
             />
           </div>

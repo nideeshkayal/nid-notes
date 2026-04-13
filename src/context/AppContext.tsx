@@ -52,48 +52,48 @@ const THEME_LABELS: Record<string, string> = {
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AppState>(() => {
-    const baseState: AppState = {
-      tree: [],
-      activeNotePath: null,
-      openTabs: [],
-      sidebarOpen: true,
-      outlineOpen: true,
-      theme: 'dark-plus',
-      focusMode: false,
-      searchOpen: false,
-      createModalOpen: false,
-      isEditing: false,
-      editorMode: 'new',
-      editorNotePath: null,
-      pickForEditor: false,
-      splitViewActive: false,
-      splitViewPath: null,
-    };
-
-    if (typeof window === 'undefined') {
-      return baseState;
-    }
-
-    const saved = localStorage.getItem('nid-notes-state');
-    if (!saved) {
-      return baseState;
-    }
-
-    try {
-      const parsed = JSON.parse(saved);
-      return {
-        ...baseState,
-        activeNotePath: parsed.activeNotePath || null,
-        openTabs: parsed.openTabs || [],
-        sidebarOpen: parsed.sidebarOpen ?? true,
-        outlineOpen: parsed.outlineOpen ?? true,
-        theme: parsed.theme || 'dark-plus',
-      };
-    } catch {
-      return baseState;
-    }
+  const [state, setState] = useState<AppState>({
+    tree: [],
+    activeNotePath: null,
+    openTabs: [],
+    sidebarOpen: true,
+    outlineOpen: true,
+    theme: 'dark-plus',
+    focusMode: false,
+    searchOpen: false,
+    createModalOpen: false,
+    isEditing: false,
+    editorMode: 'new',
+    editorNotePath: null,
+    pickForEditor: false,
+    splitViewActive: false,
+    splitViewPath: null,
   });
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const saved = localStorage.getItem('nid-notes-state');
+      if (!saved) {
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(saved);
+        setState(prev => ({
+          ...prev,
+          activeNotePath: parsed.activeNotePath || null,
+          openTabs: parsed.openTabs || [],
+          sidebarOpen: parsed.sidebarOpen ?? true,
+          outlineOpen: parsed.outlineOpen ?? true,
+          theme: parsed.theme || 'dark-plus',
+        }));
+      } catch {
+        // Ignore malformed persisted state.
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   // Apply theme
   useEffect(() => {
