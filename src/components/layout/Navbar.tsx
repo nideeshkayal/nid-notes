@@ -51,7 +51,7 @@ export default function Navbar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: '0 1 auto' }}>
         <button
           onClick={toggleSidebar}
-          title="Toggle sidebar (Ctrl+B)"
+          title="Toggle sidebar (Ctrl+\\)"
           style={{
             background: 'none',
             border: 'none',
@@ -164,7 +164,7 @@ export default function Navbar() {
 
         <button
           onClick={toggleOutline}
-          title="Toggle outline panel"
+          title="Toggle outline panel (Ctrl+B)"
           style={{
             background: 'none',
             border: 'none',

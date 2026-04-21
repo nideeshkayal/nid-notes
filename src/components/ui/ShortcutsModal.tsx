@@ -27,7 +27,7 @@ export default function ShortcutsModal() {
     { key: 'Cmd/Ctrl + N', desc: 'Create / Edit Note' },
     { key: 'Cmd/Ctrl + K', desc: 'Search / Jump' },
     { key: 'Cmd/Ctrl + \\', desc: 'Toggle Sidebar' },
-    { key: 'Cmd/Ctrl + B', desc: 'Toggle Split View' },
+    { key: 'Cmd/Ctrl + B', desc: 'Toggle Outline Panel' },
     { key: '?', desc: 'Keyboard Shortcuts' },
   ];
 

@@ -648,10 +648,31 @@ body[data-print-mode] {
     height: auto !important;
     overflow: visible !important;
     padding: 0 !important;
+    position: static !important;
+    width: 100% !important;
   }
 
-  body[data-print-mode="editor"] #editor-pane-shell > :not(#editor-preview-shell) {
+  body[data-print-mode="editor"] #editor-pane-shell {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    height: auto !important;
+  }
+
+  /* Hide everything in editor pane except the preview shell */
+  body[data-print-mode="editor"] #editor-pane-shell > #editor-toolbar,
+  body[data-print-mode="editor"] #editor-pane-shell > #editor-action-bar {
     display: none !important;
+  }
+
+  body[data-print-mode="editor"] #editor-pane-shell > div:not(#editor-toolbar):not(#editor-action-bar):not(#editor-preview-shell) > :not(#editor-preview-shell) {
+    display: none !important;
+  }
+
+  body[data-print-mode="editor"] #editor-pane-shell > div:not(#editor-toolbar):not(#editor-action-bar):not(#editor-preview-shell) {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
   }
 
   body[data-print-mode="note"] #reader-container article,

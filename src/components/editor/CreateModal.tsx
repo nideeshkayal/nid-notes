@@ -5,12 +5,20 @@ import { useApp } from '@/context/AppContext';
 import { FilePlus, FolderOpen, X } from 'lucide-react';
 
 export default function CreateModal() {
-  const { createModalOpen, setCreateModalOpen, setIsEditing, setEditorMode, toggleSearch, setPickForEditor, setSearchOpen } = useApp();
+  const { createModalOpen, setCreateModalOpen, setIsEditing, setEditorMode, setPickForEditor, setSearchOpen } = useApp();
 
   // Keyboard shortcut support
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
+        const target = e.target as HTMLElement | null;
+        const inInput =
+          target instanceof HTMLElement &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable ||
+            !!target.closest('.cm-editor'));
+        if (inInput) return;
         e.preventDefault();
         setCreateModalOpen(true);
       }

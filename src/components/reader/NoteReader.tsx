@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Calendar, User, FileText, BookOpen } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { renderMermaidIn } from '@/lib/mermaidRenderer';
 
 export type NoteData = {
   content: string;
@@ -32,20 +33,6 @@ export type NoteMeta = {
 };
 
 const noteCache = new Map<string, NoteData>();
-
-function decodeMermaidGraph(value: string) {
-  try {
-    const binary = window.atob(value);
-    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
-  } catch {
-    return '';
-  }
-}
-
-function getMermaidTheme(theme: string) {
-  return theme === 'light' || theme === 'sepia' ? 'neutral' : 'dark';
-}
 
 export default function NoteReader({
   onHeadingsChange,
@@ -112,22 +99,8 @@ export default function NoteReader({
       const article = contentRef.current?.querySelector('article');
       if (!article) return;
 
-      const mermaidEls = article.querySelectorAll('.mermaid');
-      if (mermaidEls.length > 0) {
-        try {
-          const { default: mermaid } = await import('mermaid');
-          mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme(theme) });
-          mermaidEls.forEach(el => {
-            const graph = (el as HTMLElement).dataset.graph || '';
-            el.removeAttribute('data-processed');
-            el.innerHTML = '';
-            el.textContent = decodeMermaidGraph(graph);
-          });
-          await mermaid.run({ nodes: Array.from(mermaidEls) as HTMLElement[] });
-        } catch (err) {
-          console.error('Mermaid render error', err);
-        }
-      }
+      await renderMermaidIn(article as HTMLElement, theme);
+      if (cancelled) return;
 
       const headingEls = article.querySelectorAll('h1, h2, h3, h4');
       const headings: HeadingItem[] = [];

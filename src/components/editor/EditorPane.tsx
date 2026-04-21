@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import CodeMirror from '@uiw/react-codemirror';
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { EditorView } from '@codemirror/view';
@@ -11,6 +11,7 @@ import matter from 'gray-matter';
 import FrontmatterForm from './FrontmatterForm';
 import ImagePicker from './ImagePicker';
 import { exportToPdf } from '@/lib/exportUtils';
+import { renderMermaidIn } from '@/lib/mermaidRenderer';
 
 type FrontmatterValue = string | number | boolean | string[] | undefined;
 type FrontmatterState = Record<string, FrontmatterValue>;
@@ -64,12 +65,19 @@ export default function EditorPane() {
 function EditorPaneSession() {
   const { setIsEditing, editorMode, editorNotePath, theme } = useApp();
   const compileRequestRef = useRef(0);
+  const previewContentRef = useRef<HTMLDivElement>(null);
+  const codeMirrorRef = useRef<ReactCodeMirrorRef>(null);
   const [state, setState] = useState<DraftState>(() => createInitialState(editorMode));
   const [previewMode, setPreviewMode] = useState<'editor' | 'split' | 'preview'>('split');
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [copyLabel, setCopyLabel] = useState('Copy MD');
   const [downloadLabel, setDownloadLabel] = useState('.md');
   const [pdfLabel, setPdfLabel] = useState('.pdf');
+
+  const codeMirrorTheme: 'dark' | 'light' = theme === 'light' || theme === 'sepia' ? 'light' : 'dark';
+  const isExisting = editorMode === 'existing';
+  const headerTitle = isExisting ? 'Edit Note' : 'Create Note';
+  const sanitizedFilename = useMemo(() => state.filename.replace(/\.md$/i, '').trim(), [state.filename]);
 
   useEffect(() => {
     if (editorMode !== 'existing' || !editorNotePath) return;
@@ -112,6 +120,23 @@ function EditorPaneSession() {
   }, [editorMode, state.content, state.filename, state.folder, state.frontmatter]);
 
   useEffect(() => {
+    if (previewMode === 'editor') return;
+    if (!state.htmlPreview || !previewContentRef.current) return;
+
+    let cancelled = false;
+    const run = async () => {
+      await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+      if (cancelled) return;
+      await renderMermaidIn(previewContentRef.current, theme);
+    };
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state.htmlPreview, previewMode, theme]);
+
+  useEffect(() => {
     if (previewMode === 'editor' || !state.content.trim()) return;
 
     const requestId = ++compileRequestRef.current;
@@ -152,7 +177,7 @@ function EditorPaneSession() {
 
   const handleDownloadMd = () => {
     const fullContent = getFullMarkdown();
-    const name = state.filename || 'untitled-note';
+    const name = sanitizedFilename || 'untitled-note';
     const blob = new Blob([fullContent], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -219,7 +244,7 @@ function EditorPaneSession() {
         }}
       >
         <div style={{ color: 'var(--text-accent)', fontWeight: 600, marginRight: 8 }}>
-          ▌Create Note
+          ▌{headerTitle}
         </div>
 
         <input
@@ -370,6 +395,7 @@ function EditorPaneSession() {
             />
             <div style={{ flex: 1, overflow: 'auto', background: 'var(--code-bg)' }}>
               <CodeMirror
+                ref={codeMirrorRef}
                 value={state.content}
                 height="100%"
                 extensions={[
@@ -377,7 +403,7 @@ function EditorPaneSession() {
                   EditorView.lineWrapping,
                 ]}
                 onChange={(content) => setState(prev => ({ ...prev, content }))}
-                theme="dark"
+                theme={codeMirrorTheme}
                 style={{ fontSize: 14, fontFamily: 'var(--font-mono)', height: '100%' }}
               />
             </div>
@@ -399,6 +425,7 @@ function EditorPaneSession() {
           >
             <div
               id="editor-preview-content"
+              ref={previewContentRef}
               className="prose"
               style={{
                 maxWidth: previewMode === 'split' ? '100%' : '72ch',
@@ -486,7 +513,22 @@ function EditorPaneSession() {
         <ImagePicker
           onClose={() => setImagePickerOpen(false)}
           onSelect={(url) => {
-            setState(prev => ({ ...prev, content: `${prev.content}\n![Image](${url})\n` }));
+            const view = codeMirrorRef.current?.view;
+            const snippet = `![Image](${url})`;
+            if (view) {
+              const { from, to } = view.state.selection.main;
+              view.dispatch({
+                changes: { from, to, insert: snippet },
+                selection: { anchor: from + snippet.length },
+              });
+              view.focus();
+              setState(prev => ({ ...prev, content: view.state.doc.toString() }));
+            } else {
+              setState(prev => ({
+                ...prev,
+                content: prev.content ? `${prev.content}\n${snippet}\n` : `${snippet}\n`,
+              }));
+            }
             setImagePickerOpen(false);
           }}
         />
