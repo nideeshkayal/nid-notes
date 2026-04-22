@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
@@ -6,6 +6,14 @@ import { AppProvider } from "@/context/AppContext";
 export const metadata: Metadata = {
   title: "nid notes",
   description: "A self-hosted, filesystem-driven markdown notes application",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: "#0d0d0d",
 };
 
 export default function RootLayout({

@@ -7,7 +7,7 @@ import { Download, Copy } from 'lucide-react';
 import { exportToPdf } from '@/lib/exportUtils';
 
 export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) {
-  const { activeNotePath } = useApp();
+  const { activeNotePath, isMobile, setMobileOutlineOpen } = useApp();
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState('Copy');
   const [downloadLabel, setDownloadLabel] = useState('.md');
@@ -56,6 +56,7 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
         behavior: 'smooth',
       });
     }
+    if (isMobile) setMobileOutlineOpen(false);
   };
 
   const handleCopyMarkdown = async () => {
@@ -148,7 +149,7 @@ export default function OutlinePanel({ headings }: { headings: HeadingItem[] }) 
                   alignItems: 'center',
                   gap: 4,
                   width: '100%',
-                  padding: '4px 12px',
+                  padding: isMobile ? '8px 12px' : '4px 12px',
                   paddingLeft: 12 + indent,
                   background: 'none',
                   border: 'none',

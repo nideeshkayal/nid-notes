@@ -56,6 +56,7 @@ export default function CreateModal() {
         justifyContent: 'center',
         zIndex: 1000,
         backdropFilter: 'blur(4px)',
+        padding: 16,
       }}
       onClick={() => setCreateModalOpen(false)}
       className="animate-fadeIn"

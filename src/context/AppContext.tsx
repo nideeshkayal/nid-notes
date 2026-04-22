@@ -19,6 +19,9 @@ type AppState = {
   pickForEditor: boolean;
   splitViewActive: boolean;
   splitViewPath: string | null;
+  isMobile: boolean;
+  mobileSidebarOpen: boolean;
+  mobileOutlineOpen: boolean;
 };
 
 type AppContextType = AppState & {
@@ -38,7 +41,13 @@ type AppContextType = AppState & {
   setPickForEditor: (pick: boolean) => void;
   toggleSplitView: () => void;
   setSplitViewPath: (path: string | null) => void;
+  setMobileSidebarOpen: (open: boolean) => void;
+  setMobileOutlineOpen: (open: boolean) => void;
+  toggleMobileSidebar: () => void;
+  toggleMobileOutline: () => void;
 };
+
+export const MOBILE_BREAKPOINT = 768;
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -68,7 +77,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     pickForEditor: false,
     splitViewActive: false,
     splitViewPath: null,
+    isMobile: false,
+    mobileSidebarOpen: false,
+    mobileOutlineOpen: false,
   });
+
+  // Track viewport size for mobile responsive layout
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const apply = () => {
+      setState(prev => {
+        if (prev.isMobile === mq.matches) return prev;
+        // When entering mobile, close any sticky drawer state.
+        if (mq.matches) {
+          return { ...prev, isMobile: true, mobileSidebarOpen: false, mobileOutlineOpen: false };
+        }
+        return { ...prev, isMobile: false, mobileSidebarOpen: false, mobileOutlineOpen: false };
+      });
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -188,6 +218,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, pickForEditor: pick }));
   }, []);
 
+  const setMobileSidebarOpen = useCallback((open: boolean) => {
+    setState(prev => ({
+      ...prev,
+      mobileSidebarOpen: open,
+      mobileOutlineOpen: open ? false : prev.mobileOutlineOpen,
+    }));
+  }, []);
+
+  const setMobileOutlineOpen = useCallback((open: boolean) => {
+    setState(prev => ({
+      ...prev,
+      mobileOutlineOpen: open,
+      mobileSidebarOpen: open ? false : prev.mobileSidebarOpen,
+    }));
+  }, []);
+
+  const toggleMobileSidebar = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      mobileSidebarOpen: !prev.mobileSidebarOpen,
+      mobileOutlineOpen: !prev.mobileSidebarOpen ? false : prev.mobileOutlineOpen,
+    }));
+  }, []);
+
+  const toggleMobileOutline = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      mobileOutlineOpen: !prev.mobileOutlineOpen,
+      mobileSidebarOpen: !prev.mobileOutlineOpen ? false : prev.mobileSidebarOpen,
+    }));
+  }, []);
+
   return (
     <AppContext.Provider value={{
       ...state,
@@ -207,6 +269,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPickForEditor,
       toggleSplitView,
       setSplitViewPath,
+      setMobileSidebarOpen,
+      setMobileOutlineOpen,
+      toggleMobileSidebar,
+      toggleMobileOutline,
     }}>
       {children}
     </AppContext.Provider>

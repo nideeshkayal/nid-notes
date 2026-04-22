@@ -63,12 +63,19 @@ export default function EditorPane() {
 }
 
 function EditorPaneSession() {
-  const { setIsEditing, editorMode, editorNotePath, theme } = useApp();
+  const { setIsEditing, editorMode, editorNotePath, theme, isMobile } = useApp();
   const compileRequestRef = useRef(0);
   const previewContentRef = useRef<HTMLDivElement>(null);
   const codeMirrorRef = useRef<ReactCodeMirrorRef>(null);
   const [state, setState] = useState<DraftState>(() => createInitialState(editorMode));
-  const [previewMode, setPreviewMode] = useState<'editor' | 'split' | 'preview'>('split');
+  const [previewMode, setPreviewMode] = useState<'editor' | 'split' | 'preview'>(isMobile ? 'editor' : 'split');
+
+  // Force out of split mode if user shrinks viewport into mobile range
+  useEffect(() => {
+    if (isMobile && previewMode === 'split') {
+      setPreviewMode('editor');
+    }
+  }, [isMobile, previewMode]);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [copyLabel, setCopyLabel] = useState('Copy MD');
   const [downloadLabel, setDownloadLabel] = useState('.md');
@@ -232,68 +239,79 @@ function EditorPaneSession() {
       <div
         id="editor-toolbar"
         style={{
-          height: 48,
+          minHeight: 48,
           borderBottom: '1px solid var(--border)',
           background: 'var(--bg-sidebar)',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 16px',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          padding: isMobile ? '8px 12px' : '0 16px',
           gap: 8,
           fontFamily: 'var(--font-mono)',
           fontSize: 13,
         }}
       >
-        <div style={{ color: 'var(--text-accent)', fontWeight: 600, marginRight: 8 }}>
+        <div style={{
+          color: 'var(--text-accent)',
+          fontWeight: 600,
+          marginRight: 8,
+          fontSize: isMobile ? 13 : 14,
+        }}>
           ▌{headerTitle}
         </div>
 
-        <input
-          type="text"
-          value={state.filename}
-          onChange={e => setState(prev => ({ ...prev, filename: e.target.value }))}
-          placeholder="filename"
-          style={{
-            background: 'var(--bg-base)',
-            border: '1px solid var(--border)',
-            borderRadius: 4,
-            padding: '4px 8px',
-            color: 'var(--text-primary)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            width: 160,
-            outline: 'none',
-          }}
-        />
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>.md</span>
+        {!isMobile && (
+          <>
+            <input
+              type="text"
+              value={state.filename}
+              onChange={e => setState(prev => ({ ...prev, filename: e.target.value }))}
+              placeholder="filename"
+              style={{
+                background: 'var(--bg-base)',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                padding: '4px 8px',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                width: 160,
+                outline: 'none',
+              }}
+            />
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>.md</span>
 
-        <span style={{ color: 'var(--text-muted)', fontSize: 11, margin: '0 4px' }}>in</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11, margin: '0 4px' }}>in</span>
 
-        <input
-          type="text"
-          value={state.folder}
-          onChange={e => setState(prev => ({ ...prev, folder: e.target.value }))}
-          placeholder="notes/ (root)"
-          style={{
-            background: 'var(--bg-base)',
-            border: '1px solid var(--border)',
-            borderRadius: 4,
-            padding: '4px 8px',
-            color: 'var(--text-primary)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            width: 140,
-            outline: 'none',
-          }}
-        />
+            <input
+              type="text"
+              value={state.folder}
+              onChange={e => setState(prev => ({ ...prev, folder: e.target.value }))}
+              placeholder="notes/ (root)"
+              style={{
+                background: 'var(--bg-base)',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                padding: '4px 8px',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                width: 140,
+                outline: 'none',
+              }}
+            />
+          </>
+        )}
 
         <div style={{ flex: 1 }} />
 
         <button
           onClick={() => setImagePickerOpen(true)}
+          aria-label="Insert image"
           style={{
             background: 'var(--bg-hover)',
             border: '1px solid var(--border)',
-            padding: '4px 10px',
+            padding: isMobile ? '6px 8px' : '4px 10px',
             borderRadius: 4,
             color: 'var(--text-secondary)',
             cursor: 'pointer',
@@ -304,16 +322,17 @@ function EditorPaneSession() {
             fontSize: 11,
           }}
         >
-          <ImageIcon size={12} /> Image
+          <ImageIcon size={isMobile ? 14 : 12} /> {!isMobile && 'Image'}
         </button>
 
         <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: 6, padding: 2 }}>
           <button
             onClick={() => setPreviewMode('editor')}
+            aria-label="Editor only"
             style={{
               background: previewMode === 'editor' ? 'var(--bg-active)' : 'transparent',
               border: 'none',
-              padding: '4px 8px',
+              padding: isMobile ? '6px 8px' : '4px 8px',
               borderRadius: 4,
               color: previewMode === 'editor' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
@@ -323,31 +342,34 @@ function EditorPaneSession() {
               fontSize: 11,
             }}
           >
-            <Type size={12} /> Editor
+            <Type size={isMobile ? 14 : 12} /> {!isMobile && 'Editor'}
           </button>
-          <button
-            onClick={() => setPreviewMode('split')}
-            style={{
-              background: previewMode === 'split' ? 'var(--bg-active)' : 'transparent',
-              border: 'none',
-              padding: '4px 8px',
-              borderRadius: 4,
-              color: previewMode === 'split' ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 11,
-            }}
-          >
-            <Layout size={12} /> Split
-          </button>
+          {!isMobile && (
+            <button
+              onClick={() => setPreviewMode('split')}
+              style={{
+                background: previewMode === 'split' ? 'var(--bg-active)' : 'transparent',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: 4,
+                color: previewMode === 'split' ? 'var(--text-primary)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+              }}
+            >
+              <Layout size={12} /> Split
+            </button>
+          )}
           <button
             onClick={() => setPreviewMode('preview')}
+            aria-label="Preview only"
             style={{
               background: previewMode === 'preview' ? 'var(--bg-active)' : 'transparent',
               border: 'none',
-              padding: '4px 8px',
+              padding: isMobile ? '6px 8px' : '4px 8px',
               borderRadius: 4,
               color: previewMode === 'preview' ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
@@ -357,23 +379,70 @@ function EditorPaneSession() {
               fontSize: 11,
             }}
           >
-            <Eye size={12} /> Preview
+            <Eye size={isMobile ? 14 : 12} /> {!isMobile && 'Preview'}
           </button>
         </div>
 
         <button
           onClick={handleClose}
+          aria-label="Close editor"
           style={{
             background: 'none',
             color: 'var(--text-muted)',
             border: 'none',
             cursor: 'pointer',
-            padding: '4px',
+            padding: isMobile ? 6 : 4,
             display: 'flex',
           }}
         >
-          <X size={18} />
+          <X size={isMobile ? 20 : 18} />
         </button>
+
+        {isMobile && (
+          <div style={{
+            display: 'flex',
+            gap: 6,
+            width: '100%',
+            order: 99,
+          }}>
+            <input
+              type="text"
+              value={state.filename}
+              onChange={e => setState(prev => ({ ...prev, filename: e.target.value }))}
+              placeholder="filename.md"
+              style={{
+                flex: 2,
+                background: 'var(--bg-base)',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                padding: '6px 8px',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+                outline: 'none',
+                minWidth: 0,
+              }}
+            />
+            <input
+              type="text"
+              value={state.folder}
+              onChange={e => setState(prev => ({ ...prev, folder: e.target.value }))}
+              placeholder="folder/"
+              style={{
+                flex: 1,
+                background: 'var(--bg-base)',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                padding: '6px 8px',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+                outline: 'none',
+                minWidth: 0,
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -417,7 +486,7 @@ function EditorPaneSession() {
               flex: previewMode === 'split' ? '0 0 50%' : '1 1 auto',
               width: previewMode === 'split' ? '50%' : 'auto',
               minWidth: 0,
-              padding: 32,
+              padding: isMobile ? 16 : 32,
               overflowY: 'auto',
               overflowX: 'hidden',
               background: 'var(--bg-base)',
@@ -442,19 +511,20 @@ function EditorPaneSession() {
       <div
         id="editor-action-bar"
         style={{
-          height: 40,
+          minHeight: 40,
           borderTop: '1px solid var(--border)',
           background: 'var(--bg-sidebar)',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 16px',
-          gap: 8,
+          padding: isMobile ? '6px 10px' : '0 16px',
+          gap: isMobile ? 6 : 8,
           fontFamily: 'var(--font-mono)',
           fontSize: 11,
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
         }}
       >
         <span style={{ color: 'var(--text-muted)' }}>
-          {wordCount} words · {Math.max(1, Math.round(wordCount / 200))} min read
+          {wordCount} words · {Math.max(1, Math.round(wordCount / 200))} min
         </span>
 
         <div style={{ flex: 1 }} />

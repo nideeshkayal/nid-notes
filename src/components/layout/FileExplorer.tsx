@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 function TreeNode({ node, depth = 0 }: { node: NoteNode; depth?: number }) {
-  const { activeNotePath, openNote } = useApp();
+  const { activeNotePath, openNote, isMobile, setMobileSidebarOpen } = useApp();
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`folder-${node.path}`);
@@ -22,6 +22,11 @@ function TreeNode({ node, depth = 0 }: { node: NoteNode; depth?: number }) {
     }
     return depth < 2;
   });
+
+  const handleOpenFile = (path: string) => {
+    openNote(path);
+    if (isMobile) setMobileSidebarOpen(false);
+  };
 
   const toggleOpen = () => {
     const next = !isOpen;
@@ -46,7 +51,7 @@ function TreeNode({ node, depth = 0 }: { node: NoteNode; depth?: number }) {
             alignItems: 'center',
             gap: 4,
             width: '100%',
-            padding: '4px 8px',
+            padding: isMobile ? '8px 8px' : '4px 8px',
             paddingLeft: 8 + depth * 12,
             background: 'none',
             border: 'none',
@@ -80,13 +85,13 @@ function TreeNode({ node, depth = 0 }: { node: NoteNode; depth?: number }) {
 
   return (
     <button
-      onClick={() => openNote(node.path)}
+      onClick={() => handleOpenFile(node.path)}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 4,
         width: '100%',
-        padding: '4px 8px',
+        padding: isMobile ? '8px 8px' : '4px 8px',
         paddingLeft: 8 + depth * 12,
         background: isActive ? 'var(--bg-active)' : 'none',
         border: 'none',

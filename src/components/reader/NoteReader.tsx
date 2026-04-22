@@ -41,7 +41,7 @@ export default function NoteReader({
   onHeadingsChange?: (headings: HeadingItem[]) => void;
   onMetaChange?: (meta: NoteMeta | null) => void;
 }) {
-  const { activeNotePath, theme, isEditing } = useApp();
+  const { activeNotePath, theme, isEditing, isMobile } = useApp();
   const [noteData, setNoteData] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -169,20 +169,21 @@ export default function NoteReader({
       style={{
         height: '100%',
         overflow: 'auto',
-        padding: '32px 48px',
+        padding: isMobile ? '20px 16px' : '32px 48px',
       }}
       className="animate-fadeIn"
     >
       <div style={{ maxWidth: '72ch', margin: '0 auto' }}>
-        <header style={{ marginBottom: 24 }}>
+        <header style={{ marginBottom: isMobile ? 16 : 24 }}>
           <h1 style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 32,
+            fontSize: isMobile ? 24 : 32,
             fontWeight: 600,
             color: 'var(--text-primary)',
             letterSpacing: '-0.02em',
             lineHeight: 1.2,
             marginBottom: 12,
+            overflowWrap: 'anywhere',
           }}>
             {title}
           </h1>

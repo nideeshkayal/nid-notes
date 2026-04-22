@@ -23,6 +23,7 @@ function SearchModalContent() {
     setIsEditing,
     setEditorMode,
     setEditorNotePath,
+    isMobile,
   } = useApp();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -110,7 +111,8 @@ function SearchModalContent() {
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingTop: 100,
+        paddingTop: isMobile ? 0 : 100,
+        padding: isMobile ? 0 : undefined,
         zIndex: 1000,
         backdropFilter: 'blur(4px)',
       }}
@@ -124,12 +126,15 @@ function SearchModalContent() {
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: 560,
+          maxWidth: isMobile ? '100%' : 560,
+          height: isMobile ? '100dvh' : 'auto',
           background: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 12,
-          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+          border: isMobile ? 'none' : '1px solid var(--border)',
+          borderRadius: isMobile ? 0 : 12,
+          boxShadow: isMobile ? 'none' : '0 24px 48px rgba(0,0,0,0.4)',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
         className="animate-scaleIn"
       >
@@ -149,7 +154,7 @@ function SearchModalContent() {
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={pickForEditor ? 'Select a note to edit...' : 'Search notes, Jump to file...'}
+            placeholder={pickForEditor ? 'Select a note to edit...' : 'Search notes...'}
             style={{
               flex: 1,
               background: 'none',
@@ -157,7 +162,8 @@ function SearchModalContent() {
               outline: 'none',
               color: 'var(--text-primary)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 14,
+              fontSize: isMobile ? 16 : 14,
+              minWidth: 0,
             }}
           />
           <button
@@ -181,7 +187,8 @@ function SearchModalContent() {
         </div>
 
         <div style={{
-          maxHeight: 360,
+          flex: isMobile ? 1 : undefined,
+          maxHeight: isMobile ? undefined : 360,
           overflow: 'auto',
           overscrollBehavior: 'contain',
           padding: '4px 0',
@@ -218,7 +225,7 @@ function SearchModalContent() {
                     alignItems: 'center',
                     gap: 8,
                     width: '100%',
-                    padding: '8px 16px',
+                    padding: isMobile ? '12px 16px' : '8px 16px',
                     background: index === safeSelectedIndex ? 'var(--bg-active)' : 'none',
                     border: 'none',
                     color: 'var(--text-primary)',
@@ -269,19 +276,21 @@ function SearchModalContent() {
           )}
         </div>
 
-        <div style={{
-          padding: '8px 16px',
-          borderTop: '1px solid var(--border)',
-          display: 'flex',
-          gap: 16,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          color: 'var(--text-muted)',
-        }}>
-          <span>↑↓ Navigate</span>
-          <span>↵ Open</span>
-          <span>ESC Close</span>
-        </div>
+        {!isMobile && (
+          <div style={{
+            padding: '8px 16px',
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            gap: 16,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--text-muted)',
+          }}>
+            <span>↑↓ Navigate</span>
+            <span>↵ Open</span>
+            <span>ESC Close</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -227,10 +227,20 @@ html, body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-body);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body[data-print-mode] {
   overflow: visible;
+}
+
+/* Allow content to extend into the safe area on devices with notches */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 /* Custom scrollbar */
@@ -694,3 +704,110 @@ body[data-print-mode] {
     background: #f8f8f8 !important;
   }
 }
+
+/* ==============================
+   MOBILE RESPONSIVE STYLES
+   ============================== */
+
+/* Slide-in drawer animations (mobile) */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.mobile-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  animation: fadeIn 0.18s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 84vw;
+  max-width: 320px;
+  background: var(--bg-sidebar);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  overscroll-behavior: contain;
+}
+
+.mobile-drawer-left {
+  left: 0;
+  border-right: 1px solid var(--border);
+  animation: slideInLeft 0.22s ease-out;
+  padding-left: env(safe-area-inset-left);
+}
+
+.mobile-drawer-right {
+  right: 0;
+  border-left: 1px solid var(--border);
+  animation: slideInRight 0.22s ease-out;
+  padding-right: env(safe-area-inset-right);
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: flex !important;
+  }
+
+  /* Smaller scrollbars get in the way on touch */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  /* Prose readability on small screens */
+  .prose {
+    font-size: 15.5px;
+    line-height: 1.7;
+  }
+  .prose h1 { font-size: 26px; margin-top: 1.4rem; }
+  .prose h2 { font-size: 20px; margin-top: 1.4rem; padding-left: 8px; }
+  .prose h3 { font-size: 17px; }
+  .prose pre { padding: 0.85rem; font-size: 12.5px; border-radius: 6px; }
+  .prose pre code { font-size: 12.5px; }
+  .prose table { font-size: 13px; }
+  .prose thead th { padding: 6px 8px; }
+  .prose tbody td { padding: 6px 8px; }
+  .prose blockquote { padding: 0.5rem 0.75rem; }
+
+  /* Tables that overflow get a horizontal scroll wrapper feel */
+  .prose table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Ensure mermaid SVGs scale down */
+  .prose .mermaid svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Larger touch targets on actual touch devices */
+@media (hover: none) and (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+}
+

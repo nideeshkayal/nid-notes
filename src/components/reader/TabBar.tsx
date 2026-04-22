@@ -5,7 +5,7 @@ import { useApp } from '@/context/AppContext';
 import { X } from 'lucide-react';
 
 export default function TabBar() {
-  const { openTabs, activeNotePath, openNote, closeTab } = useApp();
+  const { openTabs, activeNotePath, openNote, closeTab, isMobile } = useApp();
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
 
   if (openTabs.length === 0) return null;
@@ -18,10 +18,11 @@ export default function TabBar() {
         alignItems: 'stretch',
         background: 'var(--bg-sidebar)',
         borderBottom: '1px solid var(--border)',
-        height: 35,
+        height: isMobile ? 40 : 35,
         overflowX: 'auto',
         overflowY: 'hidden',
         flexShrink: 0,
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       {openTabs.map(tabPath => {
@@ -44,9 +45,9 @@ export default function TabBar() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '0 12px',
-              minWidth: 0,
-              maxWidth: 180,
+              padding: isMobile ? '0 10px' : '0 12px',
+              minWidth: isMobile ? 100 : 0,
+              maxWidth: isMobile ? 160 : 180,
               cursor: 'pointer',
               fontFamily: 'var(--font-mono)',
               fontSize: 12,
@@ -56,6 +57,7 @@ export default function TabBar() {
               borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
               transition: 'all 0.1s ease',
               position: 'relative',
+              flexShrink: 0,
             }}
           >
             <span style={{
@@ -75,11 +77,11 @@ export default function TabBar() {
                 border: 'none',
                 color: 'var(--text-muted)',
                 cursor: 'pointer',
-                padding: 2,
+                padding: isMobile ? 4 : 2,
                 borderRadius: 3,
                 display: 'flex',
                 flexShrink: 0,
-                opacity: isActive || hoveredTab === tabPath ? 1 : 0,
+                opacity: isMobile || isActive || hoveredTab === tabPath ? 1 : 0,
                 transition: 'opacity 0.1s',
               }}
               onMouseEnter={e => {

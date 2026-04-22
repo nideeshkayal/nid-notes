@@ -34,7 +34,22 @@ export default function Home() {
     toggleOutline,
     searchOpen,
     createModalOpen,
+    isMobile,
+    mobileSidebarOpen,
+    mobileOutlineOpen,
+    setMobileSidebarOpen,
+    setMobileOutlineOpen,
   } = useApp();
+
+  const [headings, setHeadings] = useState<HeadingItem[]>([]);
+  const [noteMeta, setNoteMeta] = useState<NoteMeta | null>(null);
+  const sidebarWidth = 260;
+  const outlineWidth = 220;
+
+  // Desktop visibility flags - on mobile we always render the center pane and
+  // present sidebar/outline as drawers controlled by mobileSidebarOpen / mobileOutlineOpen.
+  const showSidebarDesktop = sidebarOpen && !focusMode && !isMobile;
+  const showOutlineDesktop = outlineOpen && !focusMode && !isMobile;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -62,19 +77,25 @@ export default function Home() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [setSearchOpen, toggleSidebar, toggleOutline, searchOpen, createModalOpen, isEditing]);
-  const [headings, setHeadings] = useState<HeadingItem[]>([]);
-  const [noteMeta, setNoteMeta] = useState<NoteMeta | null>(null);
-  const sidebarWidth = 260;
-  const outlineWidth = 220;
 
-  const showSidebar = sidebarOpen && !focusMode;
-  const showOutline = outlineOpen && !focusMode;
+  // Lock body scroll when a mobile drawer is open
+  useEffect(() => {
+    if (!isMobile) return;
+    const anyDrawerOpen = mobileSidebarOpen || mobileOutlineOpen;
+    if (!anyDrawerOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isMobile, mobileSidebarOpen, mobileOutlineOpen]);
 
   return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh',
+      height: '100dvh',
+      maxHeight: '100dvh',
       overflow: 'hidden',
       background: 'var(--bg-base)',
     }}>
@@ -86,9 +107,10 @@ export default function Home() {
         flex: 1,
         display: 'flex',
         overflow: 'hidden',
+        minHeight: 0,
       }}>
-        {/* Left Panel - File Explorer */}
-        {showSidebar && (
+        {/* Left Panel - File Explorer (desktop) */}
+        {showSidebarDesktop && (
           <div style={{
             width: sidebarWidth,
             minWidth: 180,
@@ -109,15 +131,15 @@ export default function Home() {
           minWidth: 0,
         }}>
           {!focusMode && <TabBar />}
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
             <ErrorBoundary fallbackTitle="Reader failed" fallbackMessage="The note reader hit an error while rendering this note.">
               <NoteReader onHeadingsChange={setHeadings} onMetaChange={setNoteMeta} />
             </ErrorBoundary>
           </div>
         </div>
 
-        {/* Right Panel - Outline */}
-        {showOutline && (
+        {/* Right Panel - Outline (desktop) */}
+        {showOutlineDesktop && (
           <div style={{
             width: outlineWidth,
             minWidth: 160,
@@ -132,6 +154,24 @@ export default function Home() {
 
       {/* Status Bar */}
       {!focusMode && <StatusBar noteMeta={noteMeta} />}
+
+      {/* Mobile drawers */}
+      {isMobile && mobileSidebarOpen && (
+        <>
+          <div className="mobile-drawer-backdrop" onClick={() => setMobileSidebarOpen(false)} />
+          <aside className="mobile-drawer mobile-drawer-left">
+            <FileExplorer />
+          </aside>
+        </>
+      )}
+      {isMobile && mobileOutlineOpen && (
+        <>
+          <div className="mobile-drawer-backdrop" onClick={() => setMobileOutlineOpen(false)} />
+          <aside className="mobile-drawer mobile-drawer-right">
+            <OutlinePanel headings={headings} />
+          </aside>
+        </>
+      )}
 
       {/* Editor Overlay */}
       {isEditing && (

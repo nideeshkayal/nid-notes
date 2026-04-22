@@ -6,7 +6,11 @@ import type { NoteMeta } from '@/components/reader/NoteReader';
 import { format } from 'date-fns';
 
 export default function StatusBar({ noteMeta }: { noteMeta: NoteMeta | null }) {
-  const { activeNotePath, theme } = useApp();
+  const { activeNotePath, theme, isMobile } = useApp();
+
+  // On mobile we hide the status bar entirely to maximize content area; the
+  // footer's path/word-count info is already surfaced in the navbar / outline.
+  if (isMobile) return null;
 
   return (
     <footer
@@ -26,8 +30,21 @@ export default function StatusBar({ noteMeta }: { noteMeta: NoteMeta | null }) {
         zIndex: 100,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        minWidth: 0,
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+      }}>
+        <span style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
           ⎇ {activeNotePath ? `notes/${activeNotePath}.md` : 'No file open'}
         </span>
         {noteMeta && (
@@ -38,7 +55,7 @@ export default function StatusBar({ noteMeta }: { noteMeta: NoteMeta | null }) {
           </>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
         <span>{THEME_LABELS[theme] || theme}</span>
         <span style={{ color: 'var(--success)' }}>● Ready</span>
       </div>
